@@ -1,107 +1,102 @@
 """
-Adult (Census Income) Dataset - Esplorazione Iniziale
-Dataset UCI: https://archive.ics.uci.edu/dataset/2/adult
+Adult (Census Income) Dataset - Exploratory Data Analysis (EDA)
+UCI Dataset: https://archive.ics.uci.edu/dataset/2/adult
 """
 
-import pandas as pd
+import os
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Configurazione visualizzazioni
+# Visualization configurations
 sns.set_style("whitegrid")
 plt.rcParams['figure.figsize'] = (12, 6)
 
 # ============================================
-# 1. CARICAMENTO DATASET
+# 1. DATA LOADING
 # ============================================
 
-# URL del dataset dall'UCI Repository
+# Local file path and fallback URLs
+local_csv = "adult.csv"
 url_train = "https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data"
 url_test = "https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.test"
 
-# Nomi delle colonne
+# Column names definition
 column_names = [
     'age', 'workclass', 'fnlwgt', 'education', 'education-num',
     'marital-status', 'occupation', 'relationship', 'race', 'sex',
     'capital-gain', 'capital-loss', 'hours-per-week', 'native-country', 'income'
 ]
 
-# Caricamento dati
-df_train = pd.read_csv(
-    url_train,
-    names=column_names,
-    sep=r',\s*',
-    engine='python'
-)
+if os.path.exists(local_csv):
+    print(f"Loading dataset from local file: {local_csv}")
+    df = pd.read_csv(local_csv, names=column_names, sep=r',\s*', engine='python')
+else:
+    print("Local file not found. Fetching dataset from UCI repository...")
+    df_train = pd.read_csv(url_train, names=column_names, sep=r',\s*', engine='python')
+    df_test = pd.read_csv(url_test, names=column_names, sep=r',\s*', skiprows=1, engine='python')
+    df = pd.concat([df_train, df_test], ignore_index=True)
 
-df_test = pd.read_csv(
-    url_test,
-    names=column_names,
-    sep=r',\s*',
-    engine='python'
-)
+# Replace missing value placeholder ('?') with np.nan for accurate detection
+df.replace('?', np.nan, inplace=True)
 
-# Combiniamo train e test per esplorazione completa
-df = pd.concat([df_train, df_test], ignore_index=True)
-
-print(f"\n Dataset caricato:\n {df.shape[0]} righe, {df.shape[1]} colonne\n")
+print(f"\nDataset loaded successfully: {df.shape[0]} rows, {df.shape[1]} columns\n")
 
 
 # ============================================
-#  1. GUARDIAMO I DATI
+# 2. INITIAL DATA INSPECTION
 # ============================================
 
 print("=" * 60)
-print("PRIME 5 RIGHE DEL DATASET")
+print("FIRST 5 ROWS OF THE DATASET")
 print("=" * 60)
 print(df.head())
 print("\n")
 
 print("=" * 60)
-print("INFORMAZIONI GENERALI")
+print("DATASET INFORMATION")
 print("=" * 60)
 print(df.info())
 print("\n")
 
 print("=" * 60)
-print("STATISTICHE DESCRITTIVE PER FEATURE NUMERICHE")
+print("DESCRIPTIVE STATISTICS FOR NUMERICAL FEATURES")
 print("=" * 60)
 pd.set_option('display.max_columns', None)
-print(df.describe(percentiles=[]))
+print(df.describe())
 print("\n")
 
 
 # ============================================
-#  2. ANALISI FEATURE
+# 3. FEATURE TYPE CLASSIFICATION
 # ============================================
 
 print("=" * 60)
-print("TIPI DI FEATURE")
+print("FEATURE TYPES")
 print("=" * 60)
 
-# Feature numeriche
+# Numerical features
 numerical_features = df.select_dtypes(include=[np.number]).columns.tolist()
-# Seleziona dati numerici. Seleziona il nome delle feature associate. Crea lista
-print(f"\n Feature Numeriche ({len(numerical_features)}):")
+print(f"\nNumerical Features ({len(numerical_features)}):")
 print(numerical_features)
 
-# Feature categoriche
+# Categorical features
 categorical_features = df.select_dtypes(include=['object', 'string']).columns.tolist()
-categorical_features.remove('income')  # Rimuoviamo il target
-print(f"\n Feature Categoriche ({len(categorical_features)}):")
+if 'income' in categorical_features:
+    categorical_features.remove('income')  # Exclude target variable
+print(f"\nCategorical Features ({len(categorical_features)}):")
 print(categorical_features)
 
-print(f"\n Target variable: income")
-print("\n")
+print("\nTarget Variable: income\n")
 
 
 # ============================================
-# 3. MISSING VALUES
+# 4. MISSING VALUES ANALYSIS
 # ============================================
 
 print("=" * 60)
-print(" MISSING VALUES")
+print("MISSING VALUES ANALYSIS")
 print("=" * 60)
 
 missing = df.isnull().sum()
@@ -112,57 +107,52 @@ missing_df = pd.DataFrame({
     'Percentage (%)': missing_pct.values
 })
 missing_df = missing_df[missing_df['Missing Count'] > 0].sort_values('Missing Count', ascending=False)
-# Seleziona feature con dati mancanti. Ordine decrescente
 
 if len(missing_df) > 0:
     print(missing_df.to_string(index=False))
 else:
-    print(" Nessun missing value trovato!")
+    print("No missing values found!")
 print("\n")
 
-samples_with_missing = df.isnull().any(axis=1).sum()  # Conta righe con almeno un NaN
-total_samples = len(df)
-pct_samples_with_missing = (samples_with_missing / total_samples) * 100
-
-print(f"\n Percentuale con campioni con almeno un dato mancante:\n {pct_samples_with_missing:.2f}%\n")
+samples_with_missing = df.isnull().any(axis=1).sum()
+pct_samples_with_missing = (samples_with_missing / len(df)) * 100
+print(f"Percentage of samples with at least one missing value: {pct_samples_with_missing:.2f}%\n")
 
 
 # ============================================
-# 4. DISTRIBUZIONE TARGET
+# 5. TARGET DISTRIBUTION ANALYSIS
 # ============================================
 
 print("=" * 60)
-print(" DISTRIBUZIONE CLASSE TARGET (income)")
+print("TARGET CLASS DISTRIBUTION (income)")
 print("=" * 60)
 
-# Puliamo i valori del target (rimuovere punti finali e spazi se presenti)
-df['income'] = df['income'].str.strip().str.rstrip('.')
+# Clean target values (strip whitespace and trailing dots)
+df['income'] = df['income'].astype(str).str.strip().str.rstrip('.')
 
-# Contiamo il numero di valori per ogni classe e percentuali
 target_dist = df['income'].value_counts()
 target_pct = df['income'].value_counts(normalize=True) * 100
 
-print("\nConteggio:")
+print("\nAbsolute Counts:")
 print(target_dist)
-print("\nPercentuale:")
+print("\nPercentage Distribution:")
 print(target_pct)
 print("\n")
 
 
 # ============================================
-# 5. CARDINALITÀ FEATURE CATEGORICHE
+# 6. CATEGORICAL FEATURE CARDINALITY
 # ============================================
 
 print("=" * 60)
-print(" DISTRIBUZIONE FEATURE CATEGORICHE")
+print("CATEGORICAL FEATURE CARDINALITY")
 print("=" * 60)
-print("(Numero di valori unici per ogni feature categorica)\n")
 
 for col in categorical_features:
     n_unique = df[col].nunique()
-    print(f"{col:20s}: {n_unique:3d} valori unici")
+    print(f"{col:20s}: {n_unique:3d} unique values")
 print("\n")
 
 
-# Esportazione dati
-df.to_pickle('data.pkl')
+# Save processed DataFrame for downstream modules
+df.to_pickle('data_cleaned.pkl')
